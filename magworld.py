@@ -12,8 +12,7 @@
 #
 # When you collide with an object, you will be stopped.  But you can
 # push on the object by simply pressing the motion key again.
-#
-#
+
 
 import pygame
 from pygame.time import Clock
@@ -27,8 +26,6 @@ M = N = 200
 
 # how many pixels to use for each cell
 cellsize = 5
-
-
 
 ############################################################
 ### useful constants
@@ -80,7 +77,7 @@ class Body:
     def neighbors(self, dx, dy):
         return [body for body in bodies if self.contacts(dx, dy, body)]
 
-    def self_and_all_magnetic_neighbors(self):
+    def self_and_all_pickable_neighbors(self):
         ret = set([self])
         for dx, dy in cardinal_directions:
             for n in self.neighbors(dx,dy):
@@ -257,9 +254,10 @@ t = 0
 temp_stop = False   # whether the agent has been stopped due to a
                     # collision
 
-comovers = None     # bodies currently moving with the agent, or None
+contacts = None     # bodies currently moving with the agent, or None
                     # if the agent isn't moving
 
+holding = set()
 # Effectors consist of
 
 mdx = mdy = 0       # motion we're trying to make
@@ -269,47 +267,57 @@ magnetism = False   # whether or not magnetism is on
 
 adx = ady = 0       # motion just made
 
-
+pickup = 0
+drop = 0
 # Given the current world state and effectors, compute new world state
 # and sensor values
 def evolve_world():
-    global adx, ady, mdx, mdy, comovers, magnetism, temp_stop
+    global adx, ady, mdx, mdy, pickup, drop, contacts, temp_stop, holding
 
     # is agent trying to move?
-    if mdx or mdy:
+    if mdx or mdy or drop or pickup:
         
-        # we need to know the old comovers to test for collisions
-        oldcomovers = comovers
+        # we need to know the old contacts to test for collisions
+        oldcontacts = contacts
 
-        # determine comovers
-        comovers = set()
-        if magnetism:
-            for b in agentbody.self_and_all_magnetic_neighbors():
-                b.build_contact_subtree(mdx, mdy, comovers)
-        else:
-            agentbody.build_contact_subtree(mdx, mdy, comovers)
-
+        # determine contacts
+        contacts = set()
+        agentbody.build_contact_subtree(mdx, mdy, contacts)
+        
+        if pickup:
+            holding = agentbody.self_and_all_pickable_neighbors()
+        if drop:
+            holding = set()
+        
+        contacts -= holding
+        
         # check for collisions
-        if oldcomovers != None and comovers != oldcomovers:
+        if oldcontacts != None and contacts != oldcontacts:
             # we've hit a new object; stop temporarily
             temp_stop = True
 
         # set sensors to indicate motion as appropriate
-        if any([body.fixed for body in comovers]) or temp_stop:
-            adx = ady = 0
+        if any([body.fixed for body in contacts]) or temp_stop:
+            adx = 0
+            ady = 0
         else:
             adx = mdx
             ady = mdy
-
-        # actually move the bodies appropriately
-        for body in comovers:
+            
+        agentbody.x += adx
+        agentbody.y += ady
+        
+        for body in holding:
+            if body == agentbody: continue
             body.x += adx
             body.y += ady
 
+        print contacts
+        print "HOLDING", holding
     else:
         # agent has chosen to stop
         adx = ady = 0
-        comovers = None
+        contacts = None
         temp_stop = False
 
 # For a real agent, this would take the current sensor values and
@@ -317,7 +325,7 @@ def evolve_world():
 # the role of the agent, we use this subroutine as a place to process
 # the human's commands.
 def behave():
-    global mdx, mdy, magnetism, blind_mode
+    global mdx, mdy, blind_mode, pickup, drop
     
     for event in pygame.event.get():
          if event.type == pygame.QUIT:
@@ -329,20 +337,22 @@ def behave():
          elif event.type is pygame.KEYDOWN and mdx == mdy == 0:
              if event.unicode == 'b':
                  blind_mode = not blind_mode
-             if event.unicode == 'i':
-                 mdy = -1
              if event.unicode == 'k':
-                 mdy = 1
+                 mdy = -1
              if event.unicode == 'j':
+                 mdy = 1
+             if event.unicode == 'h':
                  mdx = -1
              if event.unicode == 'l':
                  mdx = 1
-             if event.unicode == 'm':
-                 magnetism = not magnetism
+             if event.unicode == 'p':
+                 pickup = 1
+             if event.unicode == 'd':
+                 drop = 1
              if event.unicode == 'q':
                  pygame.quit(); sys.exit();
          elif event.type is pygame.KEYUP:
-             mdx = mdy = 0
+             mdx = mdy = pickup = drop = 0
 
 
 #############################################################
