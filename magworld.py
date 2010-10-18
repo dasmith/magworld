@@ -285,6 +285,8 @@ def evolve_world():
         # determine contacts
         contacts = set()
         agentbody.build_contact_subtree(mdx, mdy, contacts)
+        for item in holding:
+            item.build_contact_subtree(mdx, mdy, contacts)
         
         if pickup:
             holding = agentbody.self_and_all_pickable_neighbors()
