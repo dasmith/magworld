@@ -86,7 +86,9 @@ class Body:
         return ret
 
     def build_contact_subtree(self, dx, dy, accum):
+        print "Called contact subtree for ", self
         if not self in accum:
+            print "  Adding neighbors", self
             accum.add(self)
             for neighbor in self.neighbors(dx, dy):
                 neighbor.build_contact_subtree(dx, dy, accum)
@@ -312,8 +314,6 @@ def evolve_world():
             body.x += adx
             body.y += ady
 
-        print contacts
-        print "HOLDING", holding
     else:
         # agent has chosen to stop
         adx = ady = 0
