@@ -22,7 +22,7 @@ from math import sqrt, pi, sin, cos, atan2
 ### Globals -------------------------------------------------------
 
 # size of the world, in cells
-M = N = 200
+M = N = 100
 
 # how many pixels to use for each cell
 cellsize = 5
@@ -96,6 +96,13 @@ class Body:
         self.build_contact_subtree(dx, dy, ret)
         return ret
 
+    def pddl_name(self):
+        return self.name.lower()+str(id(self))
+
+    def pddl_location(self):
+        return """(= (x-pos %s) %i)
+            (= (y-pos %s) %i)""" % (self.pddl_name(), self.x, self.pddl_name(), self.y)
+
     def __repr__(self):
         return self.name
 
@@ -136,7 +143,7 @@ arena = Body(rect(190,190)+
              color=gray, name='arena', fixed=True)
 bodies = [agentbody, arena,
           Rect(1, 1, 30, 30, color=blue, name='blue'),
-          Rect(1, 40, 105, 20, color=blue, name='door'),
+#          Rect(1, 40, 105, 20, color=blue, name='door'),
           Rect(1, 1, 60, 30, color=green, name='green'),
           Rect(1, 1, 60, 20, color=orange, name='orange'),
           Rect(1, 1, 13, 125, color=orange, name='reward'),
@@ -360,10 +367,75 @@ def behave():
              mdx = mdy = pickup = drop = 0
 
 
+
+#### PDDL Stuff #####################
+
+def generate_pddl():
+    template = """
+        (define (problem magworld1) (:domain Magworld)
+          (:objects
+            %s - Agent
+            %s - Pickable)
+          (:init
+            %s
+          )
+          (:goal 
+             (and (= (x-pos %s) 45)
+                  (= (y-pos %s) 30)
+                  (= (y-pos %s) 45)
+                  (= (x-pos %s) 30)
+             )
+          )
+        )
+    """ % (agentbody.pddl_name(), " ".join([b.pddl_name() for b in bodies if b != agentbody]), \
+    "\n            ".join([b.pddl_location() for b in bodies]), agentbody.pddl_name(), agentbody.pddl_name(),\
+    bodies[3].pddl_name(), bodies[3].pddl_name())
+    of = open('magworld.run','w')
+    of.writelines(template) 
+    of.close()
+
+import commands
+generate_pddl()
+pth = commands.getstatusoutput('pwd')
+pddl_results = commands.getstatusoutput("%s/Metric-FF/ff -o %s/magworld.pddl -f %s/magworld.run" % (pth[1], pth[1], pth[1]))
+print pddl_results[1]
+import time
+
+for line in pddl_results[1][pddl_results[1].find("found legal plan as follows\n\nstep")+35:].split("\n"):
+    evolve_world()
+    time.sleep(1)
+    # redraw
+    screen.fill(white)
+    draw()
+    pygame.display.update()
+    global mdx, mdy, blind_mode, pickup, drop
+    
+    try:
+        line = line.strip().split()
+        step  = line[0]
+        command = line[1]
+        args = line[2:]
+        print command
+        mdx = mdy = pickup = drop = 0
+        if command[:9] == "MOVE-WEST":
+            mdx = -1
+        elif command[:9] == "MOVE-EAST":
+            mdx = 1
+        elif command[:10] == "MOVE-SOUTH":
+            mdy = 1
+        elif command[:10] == "MOVE-NORTH":
+            mdy = -1
+        elif command == "PICKUP":
+            pickup = 1
+        elif command == "DROP":
+            drop = 1
+    except Exception, e:
+        print "Reached end of steps", e
+        break
+
 #############################################################
 # main loop
-
-while True:
+while False:
 
     # step the simulation
     evolve_world()
@@ -376,8 +448,7 @@ while True:
     # let the agent change its effector values
     behave()
 
-    # 
-     sensor and effector values
+    # sensor and effector values
     # delay to get a stable framerate
     clock.tick(60)
     t += 1
