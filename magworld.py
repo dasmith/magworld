@@ -86,9 +86,7 @@ class Body:
         return ret
 
     def build_contact_subtree(self, dx, dy, accum):
-        print "Called contact subtree for ", self
         if not self in accum:
-            print "  Adding neighbors", self
             accum.add(self)
             for neighbor in self.neighbors(dx, dy):
                 neighbor.build_contact_subtree(dx, dy, accum)
@@ -137,11 +135,11 @@ arena = Body(rect(190,190)+
              4, 4,
              color=gray, name='arena', fixed=True)
 bodies = [agentbody, arena,
-          Rect(10, 10, 30, 30, color=blue, name='blue'),
-          Rect(1, 50, 105, 20, color=blue, name='door'),
-          Rect(10, 10, 60, 30, color=green, name='green'),
-          Rect(5, 10, 60, 20, color=orange, name='orange'),
-          Rect(2, 2, 13, 125, color=orange, name='reward'),
+          Rect(1, 1, 30, 30, color=blue, name='blue'),
+          Rect(1, 40, 105, 20, color=blue, name='door'),
+          Rect(1, 1, 60, 30, color=green, name='green'),
+          Rect(1, 1, 60, 20, color=orange, name='orange'),
+          Rect(1, 1, 13, 125, color=orange, name='reward'),
           Body(hline(0,0,4)+
                vline(4,0,15)+
                hline(4,15,3)+
@@ -282,6 +280,7 @@ def evolve_world():
         # we need to know the old contacts to test for collisions
         oldcontacts = contacts
 
+  
         # determine contacts
         contacts = set()
         agentbody.build_contact_subtree(mdx, mdy, contacts)
@@ -290,18 +289,22 @@ def evolve_world():
         
         if pickup:
             holding = agentbody.self_and_all_pickable_neighbors()
+            pickup = 0
         if drop:
             holding = set()
+            drop = 0
         
-        contacts -= holding
-        
+
         # check for collisions
         if oldcontacts != None and contacts != oldcontacts:
             # we've hit a new object; stop temporarily
             temp_stop = True
-
+        
+        contacts -= holding
+        if agentbody in contacts: contacts.remove(agentbody)
+            
         # set sensors to indicate motion as appropriate
-        if any([body.fixed for body in contacts]) or temp_stop:
+        if len(contacts) != 0:
             adx = 0
             ady = 0
         else:
@@ -373,7 +376,11 @@ while True:
     # let the agent change its effector values
     behave()
 
-    # print sensor and effector values
+    # 
+     sensor and effector values
+    # delay to get a stable framerate
+    clock.tick(60)
+    t += 1
     format = "Timestep: %4s     Effectors: %2s %2s %s     Sensors: %2s %2s %s"
     print format  % (t,
                      mdx, mdy,
@@ -382,6 +389,4 @@ while True:
                      " ".join([('1' if agentbody.neighbors(dx2,dy2) else '0')
                                for dx2, dy2 in cardinal_directions]))
 
-    # delay to get a stable framerate
-    clock.tick(60)
-    t += 1
+
